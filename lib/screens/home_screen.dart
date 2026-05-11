@@ -1,10 +1,5 @@
 // ════════════════════════════════════════════════════
 // screens/home_screen.dart — главный экран
-//
-// Отображает: заголовок + стрик, выбор даты, карточку дня,
-//             кнопку "Начать запись"
-// Свайп влево → PlannerScreen
-// Виджет Android → _checkWidgetTap()
 // ════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
@@ -31,7 +26,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // ─── Состояние ────────────────────────────────────────────────
   int _streak = 0;
   DateTime _selectedDate = DateTime.now();
   Map<String, List<String>> _allEntries = {};
@@ -45,20 +39,15 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _showSplash = false;
   bool _isPremium = false;
 
-  // ─── Platform channels ────────────────────────────────────────
-  // Android: виджет рабочего стола + будильник
-  static const _widgetChannel  = MethodChannel('com.example.mindful_diary/widget');
-  static const _alarmChannel   = MethodChannel('com.example.mindful_diary/alarm'); // используется в PlannerScreen
+  static const _widgetChannel = MethodChannel('com.example.mindful_diary/widget');
 
-  // ─── Lifecycle ────────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
     _load();
-    _checkWidgetTap(); // Android: открыть плanner если тапнули виджет
+    _checkWidgetTap();
   }
 
-  // ─── Android widget tap ───────────────────────────────────────
   Future<void> _checkWidgetTap() async {
     try {
       final result = await _widgetChannel.invokeMethod<bool>('checkOpenPlanner');
@@ -71,23 +60,30 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (_) {}
   }
 
-  // ─── Загрузка данных из SharedPreferences ─────────────────────
+  String _dateKey(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw         = prefs.getString('entries') ?? '{}';
-    final ratingsRaw  = prefs.getString('ratings') ?? '{}';
-    final notesRaw    = prefs.getString('notes')   ?? '{}';
-    final plansRaw    = prefs.getString('plans')   ?? '{}';
-    final goal        = prefs.getString('goal')    ?? '';
+    final raw          = prefs.getString('entries')      ?? '{}';
+    final ratingsRaw   = prefs.getString('ratings')      ?? '{}';
+    final notesRaw     = prefs.getString('notes')        ?? '{}';
+    final plansRaw     = prefs.getString('plans')        ?? '{}';
+    final goal         = prefs.getString('goal')         ?? '';
     final goalCategory = prefs.getString('goalCategory') ?? 'money';
-    final isPremium   = prefs.getBool('isPremium') ?? false;
-    final splashSeen  = prefs.getBool('splashSeen') ?? false;
+    final isPremium    = prefs.getBool('isPremium')      ?? false;
+    final splashSeen   = prefs.getBool('splashSeen')     ?? false;
 
     setState(() {
-      _allEntries = _decodeEntries(raw);
-      _allRatings = _decodeRatings(ratingsRaw);
+      _allEntries = Map<String, List<String>>.from(
+        (jsonDecode(raw) as Map).map((k, v) => MapEntry(k, List<String>.from(v))));
+      _allRatings = Map<String, Map<String, int>>.from(
+        (jsonDecode(ratingsRaw) as Map).map((k, v) => MapEntry(k, Map<String, int>.from(v))));
       _allNotes   = Map<String, String>.from(jsonDecode(notesRaw) as Map);
-      _allPlans   = _decodePlans(plansRaw);
+      _allPlans   = Map<String, List<Map<String, dynamic>>>.from(
+        (jsonDecode(plansRaw) as Map).map((k, v) => MapEntry(
+            k, List<Map<String, dynamic>>.from(
+                (v as List).map((e) => Map<String, dynamic>.from(e))))));
       _streak     = _calcStreak();
       _goal       = goal;
       _goalCategory = goalCategory;
@@ -98,18 +94,15 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // ─── Сохранение данных ────────────────────────────────────────
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('entries', jsonEncode(_allEntries));
     await prefs.setString('ratings', jsonEncode(_allRatings));
     await prefs.setString('notes',   jsonEncode(_allNotes));
     await prefs.setString('plans',   jsonEncode(_allPlans));
-    // Обновляем Android-виджет рабочего стола
     try { await _widgetChannel.invokeMethod('updateWidget'); } catch (_) {}
   }
 
-  // ─── Сохранение цели (из онбординга и диалога редактирования) ─
   Future<void> _saveGoal(String goal, String category) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('goal', goal);
@@ -121,57 +114,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // ─── Supabase: активация промокода ───────────────────────────
-  // (вынесено в HomeScreen т.к. нужен setState для _isPremium)
-  Future<void> _activateCode(String code) async {
-    // TODO: вынести URL и ключ в отдельный config/secrets файл
-    const supabaseUrl  = 'https://vfbjtqjpkjcjceodlzbt.supabase.co/rest/v1/promo_codes';
-    const supabaseKey  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmYmp0cWpwa2pjamNlb2RsemJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTg2NjIsImV4cCI6MjA5MzkzNDY2Mn0.pyJs02GZ6joGUzHE4FYD7EAwqlHvuOrEdg_B4ztUeaA';
-    final headers = {
-      'apikey': supabaseKey,
-      'Authorization': 'Bearer $supabaseKey',
-      'Content-Type': 'application/json',
-    };
-
-    try {
-      final checkResponse = await _httpGet('$supabaseUrl?code=eq.$code&is_used=eq.false', headers);
-      final data = jsonDecode(checkResponse) as List;
-      if (data.isEmpty) {
-        _showSnack('Код недействителен или уже использован');
-        return;
-      }
-      final id = data[0]['id'];
-      await _httpPatch('$supabaseUrl?id=eq.$id', headers,
-          jsonEncode({'is_used': true, 'used_at': DateTime.now().toIso8601String()}));
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('isPremium', true);
-      setState(() => _isPremium = true);
-      _showSnack('🔥 Premium активирован!');
-    } catch (_) {
-      _showSnack('Ошибка соединения. Проверь интернет.');
-    }
-  }
-
-  // ─── Вспомогательные: HTTP ────────────────────────────────────
-  // Используем стандартный http пакет (импортирован в pubspec)
-  Future<String> _httpGet(String url, Map<String, String> headers) async {
-    // ignore: avoid_relative_lib_imports — реальный импорт в pubspec
-    final uri = Uri.parse(url);
-    // Используем http пакет как в оригинальном коде
-    // Этот метод — обёртка для читаемости
-    throw UnimplementedError('Вставить import http и использовать http.get');
-  }
-
-  Future<void> _httpPatch(String url, Map<String, String> headers, String body) async {
-    throw UnimplementedError('Вставить import http и использовать http.patch');
-  }
-
-  // ─── Snackbar helper ──────────────────────────────────────────
-  void _showSnack(String msg) {
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-  }
-
-  // ─── Стрик: кол-во последовательных дней с записью ───────────
   int _calcStreak() {
     int streak = 0;
     DateTime day = DateTime.now();
@@ -186,10 +128,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return streak;
   }
 
-  // ─── Утилиты ──────────────────────────────────────────────────
-  String _dateKey(DateTime d) =>
-      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-
   List<String>? get _selectedEntries => _allEntries[_dateKey(_selectedDate)];
 
   bool _isToday(DateTime d) => _dateKey(d) == _dateKey(DateTime.now());
@@ -201,10 +139,8 @@ class _HomeScreenState extends State<HomeScreen> {
         (d.year == today.year && d.month == today.month && d.day > today.day);
   }
 
-  // ─── Навигация к вопросам дня ─────────────────────────────────
   void _goToQuestions() async {
     final daysDiff = DateTime.now().difference(_selectedDate).inDays;
-    // Premium gate: записи старше 3 дней только для Premium
     if (daysDiff > 3 && !AppSettings.of(context).isPremium) {
       _showPremiumDialog();
       return;
@@ -255,12 +191,15 @@ class _HomeScreenState extends State<HomeScreen> {
             'Редактирование записей старше 3 дней доступно только в Premium.\n\nВведи код активации в настройках.',
             style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context),
-              child: const Text('Понял', style: TextStyle(color: Colors.grey))),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Понял', style: TextStyle(color: Colors.grey)),
+          ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()));
             },
             style: ElevatedButton.styleFrom(
                 backgroundColor: accent, foregroundColor: Colors.white, elevation: 0),
@@ -271,7 +210,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ─── Диалог редактирования цели ───────────────────────────────
   void _editGoal() {
     final controller = TextEditingController(text: _goal);
     showDialog(
@@ -287,9 +225,10 @@ class _HomeScreenState extends State<HomeScreen> {
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700,
               color: Theme.of(context).colorScheme.onSurface),
           decoration: const InputDecoration(
-              border: InputBorder.none,
-              hintText: 'Твоя цель...',
-              hintStyle: TextStyle(color: Colors.grey)),
+            border: InputBorder.none,
+            hintText: 'Твоя цель...',
+            hintStyle: TextStyle(color: Colors.grey),
+          ),
         ),
         actions: [
           TextButton(
@@ -299,7 +238,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ElevatedButton(
             onPressed: () {
               final goal = controller.text.trim();
-              if (goal.isNotEmpty) { _saveGoal(goal, _goalCategory); Navigator.pop(context); }
+              if (goal.isNotEmpty) {
+                _saveGoal(goal, _goalCategory);
+                Navigator.pop(context);
+              }
             },
             style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1A1A1A),
@@ -311,7 +253,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ─── Переходы (animations) ────────────────────────────────────
   PlannerScreen _buildPlannerScreen() => PlannerScreen(
     allPlans: _allPlans,
     onSave: (key, plans) async {
@@ -348,10 +289,8 @@ class _HomeScreenState extends State<HomeScreen> {
         FadeTransition(opacity: animation, child: child),
   );
 
-  // ─── BUILD ────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    // Состояния загрузки / онбординга
     if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     if (_showSplash) return SplashOnboarding(onDone: () async {
       final prefs = await SharedPreferences.getInstance();
@@ -360,19 +299,18 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     if (_showOnboarding) return OnboardingScreen(onDone: _saveGoal);
 
-    final hasEntry = _selectedEntries != null;
-    final isToday  = _isToday(_selectedDate);
-    final isFuture = _isFuture(_selectedDate);
-    final accent   = AppSettings.of(context).accent;
-    final isDark   = AppSettings.of(context).themeMode == ThemeMode.dark;
+    final hasEntry  = _selectedEntries != null;
+    final isToday   = _isToday(_selectedDate);
+    final isFuture  = _isFuture(_selectedDate);
+    final accent    = AppSettings.of(context).accent;
+    final isDark    = AppSettings.of(context).themeMode == ThemeMode.dark;
     final textColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: GestureDetector(
-        // Свайп влево → Planner
         onHorizontalDragEnd: (details) {
-          if ((details.primaryVelocity ?? 0) < -300) {
+          if (details.primaryVelocity != null && details.primaryVelocity! < -300) {
             Navigator.push(context, _slideRoute(_buildPlannerScreen()));
           }
         },
@@ -382,23 +320,216 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Заголовок: логотип + цель + стрик + иконки ──
-                _buildHeader(accent, textColor),
+                // ── Header ──
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('MODO',
+                            style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w900,
+                                color: textColor,
+                                letterSpacing: 2)),
+                        if (_goal.isNotEmpty)
+                          GestureDetector(
+                            onTap: _editGoal,
+                            child: Text('→ $_goal',
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    color: accent,
+                                    fontWeight: FontWeight.w600)),
+                          ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        // Стрик
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: _streak > 0 ? accent : Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(children: [
+                            const Text('🔥', style: TextStyle(fontSize: 14)),
+                            const SizedBox(width: 4),
+                            Text('$_streak',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14)),
+                          ]),
+                        ),
+                        const SizedBox(width: 8),
+                        // Статистика
+                        GestureDetector(
+                          onTap: () => Navigator.push(context,
+                              _slideRoute(StatsScreen(allRatings: _allRatings))),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: textColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(Icons.bar_chart, color: textColor, size: 20),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Настройки
+                        GestureDetector(
+                          onTap: () => Navigator.push(
+                              context, _slideRoute(const SettingsScreen())),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: textColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(Icons.more_vert, color: textColor, size: 20),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
 
                 const SizedBox(height: 32),
 
-                // ── Переключатель даты ───────────────────────────
-                _buildDateSwitcher(accent),
+                // ── Date switcher (оригинальный стиль) ──
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      onPressed: () => setState(() =>
+                          _selectedDate = _selectedDate.subtract(const Duration(days: 1))),
+                      icon: Icon(Icons.chevron_left, size: 32, color: accent),
+                    ),
+                    GestureDetector(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _selectedDate,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2099),
+                          locale: const Locale('ru'),
+                          builder: (context, child) => Theme(
+                            data: Theme.of(context).copyWith(
+                              colorScheme: const ColorScheme.light(
+                                primary: Color(0xFFE8927C),
+                                onPrimary: Colors.white,
+                                surface: Color(0xFFFDF6F0),
+                              ),
+                            ),
+                            child: child!,
+                          ),
+                        );
+                        if (picked != null) setState(() => _selectedDate = picked);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isToday
+                              ? const Color(0xFFFFD700)
+                              : Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: isToday
+                              ? [BoxShadow(
+                                  color: const Color(0xFFFFD700).withOpacity(0.4),
+                                  blurRadius: 12, spreadRadius: 2)]
+                              : [],
+                        ),
+                        child: Row(children: [
+                          Icon(Icons.calendar_today,
+                              size: 16,
+                              color: isToday ? const Color(0xFF1A1A1A) : accent),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${['Пн','Вт','Ср','Чт','Пт','Сб','Вс'][_selectedDate.weekday - 1]}, '
+                            '${_selectedDate.day} '
+                            '${['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'][_selectedDate.month - 1]} '
+                            '${_selectedDate.year}',
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: isToday
+                                    ? const Color(0xFF1A1A1A)
+                                    : Theme.of(context).colorScheme.onSurface),
+                          ),
+                          if (hasEntry) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                                width: 8, height: 8,
+                                decoration: BoxDecoration(
+                                    color: isToday
+                                        ? const Color(0xFF1A1A1A)
+                                        : accent,
+                                    shape: BoxShape.circle)),
+                          ],
+                        ]),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: !isFuture
+                          ? () => setState(() =>
+                              _selectedDate = _selectedDate.add(const Duration(days: 1)))
+                          : null,
+                      icon: Icon(Icons.chevron_right,
+                          size: 32,
+                          color: !isFuture ? accent : Colors.grey.shade300),
+                    ),
+                  ],
+                ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 32),
 
-                // ── Карточка дня (пустая / запись / будущее) ────
-                Expanded(child: _buildDayCard(hasEntry, isToday, isFuture)),
+                // ── Entry card ──
+                Expanded(
+                  child: isFuture
+                      ? _FutureCard()
+                      : hasEntry
+                          ? EntryCard(
+                              answers: _selectedEntries!,
+                              dailyQuestions: getDailyQuestions(
+                                  _selectedDate, category: _goalCategory),
+                              surveyPack: getDailySurveyPack(
+                                  _selectedDate, category: _goalCategory),
+                              isToday: isToday,
+                              note: _allNotes[_dateKey(_selectedDate)] ?? '',
+                              onNoteSaved: (text) async {
+                                setState(() =>
+                                    _allNotes[_dateKey(_selectedDate)] = text);
+                                await _save();
+                              },
+                            )
+                          : _EmptyCard(isToday: isToday),
+                ),
 
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
 
-                // ── Кнопка записи (не для будущего) ─────────────
-                if (!isFuture) _buildActionButton(hasEntry, accent),
+                // ── Button ──
+                if (!isFuture)
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: _goToQuestions,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: accent,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20)),
+                        elevation: 0,
+                      ),
+                      child: Text(
+                        hasEntry ? '✏️ Редактировать' : '🔥 Начать запись дня',
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -406,178 +537,9 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-
-  // ─── Шапка ────────────────────────────────────────────────────
-  Widget _buildHeader(Color accent, Color textColor) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        // Логотип + цель
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('MODO',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900,
-                    color: textColor, letterSpacing: 2)),
-            if (_goal.isNotEmpty)
-              GestureDetector(
-                onTap: _editGoal,
-                child: Text('→ $_goal',
-                    style: TextStyle(fontSize: 13, color: accent,
-                        fontWeight: FontWeight.w600)),
-              ),
-          ],
-        ),
-        // Правая часть: стрик + статистика + настройки
-        Row(
-          children: [
-            _buildStreakBadge(accent, textColor),
-            const SizedBox(width: 8),
-            _buildIconBtn(Icons.bar_chart, textColor,
-                () => Navigator.push(context,
-                    _slideRoute(StatsScreen(allRatings: _allRatings)))),
-            const SizedBox(width: 8),
-            _buildIconBtn(Icons.more_vert, textColor,
-                () => Navigator.push(context, _slideRoute(const SettingsScreen()))),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStreakBadge(Color accent, Color textColor) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-    decoration: BoxDecoration(
-      color: _streak > 0 ? accent : Colors.grey.shade300,
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Row(children: [
-      const Text('🔥', style: TextStyle(fontSize: 14)),
-      const SizedBox(width: 4),
-      Text('$_streak',
-          style: const TextStyle(color: Colors.white,
-              fontWeight: FontWeight.bold, fontSize: 14)),
-    ]),
-  );
-
-  Widget _buildIconBtn(IconData icon, Color textColor, VoidCallback onTap) =>
-      GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: textColor.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: textColor, size: 20),
-        ),
-      );
-
-  // ─── Выбор даты ───────────────────────────────────────────────
-  Widget _buildDateSwitcher(Color accent) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        IconButton(
-          onPressed: () => setState(() =>
-              _selectedDate = _selectedDate.subtract(const Duration(days: 1))),
-          icon: Icon(Icons.chevron_left, size: 32, color: accent),
-        ),
-        GestureDetector(
-          onTap: () async {
-            final picked = await showDatePicker(
-              context: context,
-              initialDate: _selectedDate,
-              firstDate: DateTime(2020),
-              lastDate: DateTime(2099),
-              locale: const Locale('ru'),
-            );
-            if (picked != null) setState(() => _selectedDate = picked);
-          },
-          child: Text(
-            _isToday(_selectedDate)
-                ? 'Сегодня'
-                : '${_selectedDate.day} ${_monthName(_selectedDate.month)} ${_selectedDate.year}',
-            style: TextStyle(
-              fontSize: 18, fontWeight: FontWeight.w700,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-          ),
-        ),
-        IconButton(
-          onPressed: _isFuture(_selectedDate.add(const Duration(days: 1)))
-              ? null
-              : () => setState(() =>
-                  _selectedDate = _selectedDate.add(const Duration(days: 1))),
-          icon: Icon(Icons.chevron_right, size: 32, color: accent),
-        ),
-      ],
-    );
-  }
-
-  // ─── Карточка дня ─────────────────────────────────────────────
-  Widget _buildDayCard(bool hasEntry, bool isToday, bool isFuture) {
-    if (isFuture) return _FutureCard();
-    if (!hasEntry) return _EmptyCard(isToday: isToday);
-
-    return EntryCard(
-      answers: _selectedEntries!,
-      dailyQuestions: getDailyQuestions(_selectedDate, category: _goalCategory),
-      surveyPack: getDailySurveyPack(_selectedDate, category: _goalCategory),
-      isToday: isToday,
-      note: _allNotes[_dateKey(_selectedDate)] ?? '',
-      onNoteSaved: (text) async {
-        setState(() => _allNotes[_dateKey(_selectedDate)] = text);
-        await _save();
-      },
-    );
-  }
-
-  // ─── Кнопка действия ──────────────────────────────────────────
-  Widget _buildActionButton(bool hasEntry, Color accent) => SizedBox(
-    width: double.infinity,
-    height: 56,
-    child: ElevatedButton(
-      onPressed: _goToQuestions,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: accent,
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        elevation: 0,
-      ),
-      child: Text(
-        hasEntry ? '✏️ Редактировать' : '🔥 Начать запись дня',
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-      ),
-    ),
-  );
-
-  // ─── Декодирование JSON ───────────────────────────────────────
-  static Map<String, List<String>> _decodeEntries(String raw) =>
-      Map<String, List<String>>.from(
-        (jsonDecode(raw) as Map).map((k, v) => MapEntry(k, List<String>.from(v))));
-
-  static Map<String, Map<String, int>> _decodeRatings(String raw) =>
-      Map<String, Map<String, int>>.from(
-        (jsonDecode(raw) as Map).map((k, v) => MapEntry(k, Map<String, int>.from(v))));
-
-  static Map<String, List<Map<String, dynamic>>> _decodePlans(String raw) =>
-      Map<String, List<Map<String, dynamic>>>.from(
-        (jsonDecode(raw) as Map).map((k, v) => MapEntry(
-            k, List<Map<String, dynamic>>.from((v as List).map((e) => Map<String, dynamic>.from(e))))));
-
-  // ─── Название месяца ──────────────────────────────────────────
-  static String _monthName(int month) {
-    const names = ['января','февраля','марта','апреля','мая','июня',
-                   'июля','августа','сентября','октября','ноября','декабря'];
-    return names[month - 1];
-  }
 }
 
-// ════════════════════════════════════════════════════
-// Маленькие карточки (используются только внутри HomeScreen)
-// ════════════════════════════════════════════════════
-
+// ─── Карточки ────────────────────────────────────────────────
 class _FutureCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -613,22 +575,28 @@ class _EmptyCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(24),
-        // Золотая рамка для сегодняшнего дня без записи
-        border: isToday ? Border.all(color: const Color(0xFFFFD700), width: 2) : null,
+        border: isToday
+            ? Border.all(color: const Color(0xFFFFD700), width: 2)
+            : null,
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(isToday ? '🔥' : '📭', style: const TextStyle(fontSize: 48)),
+          Text(isToday ? '🔥' : '📭',
+              style: const TextStyle(fontSize: 48)),
           const SizedBox(height: 16),
           Text(
             isToday ? 'Как прошёл день?' : 'Запись не сделана',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700,
+            style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
                 color: Theme.of(context).colorScheme.onSurface),
           ),
           const SizedBox(height: 8),
           Text(
-            isToday ? 'Займёт меньше 3 минут' : 'Можешь заполнить задним числом',
+            isToday
+                ? 'Займёт меньше 3 минут'
+                : 'Можешь заполнить задним числом',
             style: const TextStyle(color: Colors.grey),
           ),
         ],
