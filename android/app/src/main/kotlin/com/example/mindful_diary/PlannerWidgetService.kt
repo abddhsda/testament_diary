@@ -11,9 +11,8 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 class PlannerWidgetService : RemoteViewsService() {
-    override fun onGetViewFactory(intent: Intent): RemoteViewsFactory {
-        return PlannerListFactory(applicationContext, intent)
-    }
+    override fun onGetViewFactory(intent: Intent): RemoteViewsFactory =
+        PlannerListFactory(applicationContext, intent)
 }
 
 class PlannerListFactory(
@@ -22,13 +21,7 @@ class PlannerListFactory(
 ) : RemoteViewsService.RemoteViewsFactory {
 
     private val items = mutableListOf<PlanItem>()
-
-    data class PlanItem(
-        val id: String,
-        val text: String,
-        val time: String?,
-        val done: Boolean
-    )
+    data class PlanItem(val id: String, val text: String, val time: String?, val done: Boolean)
 
     override fun onCreate() { loadPlans() }
     override fun onDataSetChanged() { loadPlans() }
@@ -39,7 +32,6 @@ class PlannerListFactory(
         val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         val plansJson = prefs.getString("flutter.plans", "{}") ?: "{}"
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-
         try {
             val allPlans = JSONObject(plansJson)
             val todayPlans: JSONArray = allPlans.optJSONArray(today) ?: return
@@ -52,9 +44,7 @@ class PlannerListFactory(
                     done = p.optBoolean("done", false)
                 ))
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        } catch (e: Exception) { e.printStackTrace() }
     }
 
     override fun getCount() = items.size
@@ -64,34 +54,20 @@ class PlannerListFactory(
     override fun getViewTypeCount() = 1
 
     override fun getViewAt(position: Int): RemoteViews {
-        if (position >= items.size) {
-            return RemoteViews(context.packageName, R.layout.widget_plan_item)
-        }
-
+        if (position >= items.size) return RemoteViews(context.packageName, R.layout.widget_plan_item)
         val item = items[position]
         val rv = RemoteViews(context.packageName, R.layout.widget_plan_item)
 
-        // Галочка или кружок
         rv.setTextViewText(R.id.widget_item_check, if (item.done) "✓" else "○")
-        rv.setTextColor(
-            R.id.widget_item_check,
-            if (item.done)
-                android.graphics.Color.parseColor("#4CAF50") // зелёный
-            else
-                android.graphics.Color.parseColor("#AAAAAA")
-        )
+        rv.setTextColor(R.id.widget_item_check,
+            if (item.done) android.graphics.Color.parseColor("#4CAF50")
+            else android.graphics.Color.parseColor("#AAAAAA"))
 
-        // Текст — зачёркнутый если done
         rv.setTextViewText(R.id.widget_item_text, item.text)
-        rv.setTextColor(
-            R.id.widget_item_text,
-            if (item.done)
-                android.graphics.Color.parseColor("#666666")
-            else
-                android.graphics.Color.parseColor("#FFFFFF")
-        )
+        rv.setTextColor(R.id.widget_item_text,
+            if (item.done) android.graphics.Color.parseColor("#666666")
+            else android.graphics.Color.parseColor("#FFFFFF"))
 
-        // Время
         if (!item.time.isNullOrEmpty()) {
             rv.setViewVisibility(R.id.widget_item_time, android.view.View.VISIBLE)
             rv.setTextViewText(R.id.widget_item_time, "⏰ ${item.time}")
@@ -99,10 +75,7 @@ class PlannerListFactory(
             rv.setViewVisibility(R.id.widget_item_time, android.view.View.GONE)
         }
 
-        // fillInIntent для переключения done — заполняет шаблон из setPendingIntentTemplate
-        val fillIntent = Intent().apply {
-            putExtra(PlannerWidget.EXTRA_PLAN_ID, item.id)
-        }
+        val fillIntent = Intent().apply { putExtra(PlannerWidget.EXTRA_PLAN_ID, item.id) }
         rv.setOnClickFillInIntent(R.id.widget_item_root, fillIntent)
 
         return rv

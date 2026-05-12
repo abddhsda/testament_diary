@@ -27,6 +27,7 @@ environment:
 # dependencies can be manually updated by changing the version numbers below to
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
+  
 dependencies:
   flutter:
     sdk: flutter
@@ -41,6 +42,8 @@ dependencies:
   timezone: 0.11.0
   fl_chart: ^1.2.0
   http: ^1.6.0
+  share_plus: ^10.0.0
+  path_provider: ^2.1.0
 
 
 

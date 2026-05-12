@@ -1,38 +1,57 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:padding="12dp"
     android:background="@drawable/widget_background">
 
-    <!-- Заголовок — тап открывает планировщик в приложении -->
+    <!-- Заголовок — тап открывает планировщик -->
     <TextView
         android:id="@+id/widget_title"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="📋 Планы на сегодня"
         android:textSize="14sp"
         android:textStyle="bold"
         android:textColor="@color/widget_text"
-        android:layout_marginBottom="8dp"
-        android:paddingBottom="8dp" />
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_toStartOf="@id/widget_add_btn"
+        android:layout_marginEnd="8dp" />
 
-    <!-- Скроллируемый список планов с галочками -->
+    <!-- Кнопка + в правом верхнем углу — тап открывает добавление плана -->
+    <TextView
+        android:id="@+id/widget_add_btn"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:text="+"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:gravity="center"
+        android:background="@drawable/widget_add_bg"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentTop="true" />
+
+    <!-- Скроллируемый список планов -->
     <ListView
         android:id="@+id/widget_list"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:layout_below="@id/widget_title"
+        android:layout_marginTop="8dp" />
 
-    <!-- Показывается если планов нет -->
+    <!-- Заглушка если нет планов -->
     <TextView
         android:id="@+id/widget_empty"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:text="Нет планов на сегодня"
+        android:layout_below="@id/widget_title"
+        android:layout_marginTop="8dp"
+        android:text="Нет планов.\nНажми + чтобы добавить"
         android:textSize="13sp"
         android:textColor="@color/widget_subtext"
         android:gravity="center"
         android:visibility="gone" />
 
-</LinearLayout>
+</RelativeLayout>
