@@ -6,8 +6,9 @@ import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
 import android.app.PendingIntent
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
 import android.graphics.drawable.GradientDrawable
-import android.net.Uri
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
@@ -39,93 +40,91 @@ class PlannerWidget : AppWidgetProvider() {
         const val ACTION_TOGGLE_DONE = "com.example.mindful_diary.TOGGLE_DONE"
         const val EXTRA_PLAN_ID = "plan_id"
 
-        // ─── Акцентные цвета (порядок совпадает с AppColors.accents в Dart) ───
-        // index 0 = orange, 1 = blue, 2 = purple, 3 = green
+        // Акцентные цвета — порядок совпадает с AppColors.accents в Dart
         private val ACCENT_COLORS = intArrayOf(
-            0xFFE8927C.toInt(), // orange
-            0xFF5B8CDB.toInt(), // blue
-            0xFF9B59B6.toInt(), // purple
-            0xFF2ECC71.toInt()  // green
+            0xFFE8927C.toInt(), // 0 — orange
+            0xFF5B8CDB.toInt(), // 1 — blue
+            0xFF9B59B6.toInt(), // 2 — purple
+            0xFF2ECC71.toInt()  // 3 — green
         )
 
         fun updateWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
             val views = RemoteViews(context.packageName, R.layout.planner_widget)
             val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
 
-            // ─── Читаем accentIndex сохранённый Flutter-ом ───────────────────
+            // ── Акцентный цвет кнопки + ──────────────────────────────────
             val accentIndex = prefs.getInt("flutter.accentIndex", 0)
-                .coerceIn(0, ACCENT_COLORS.size - 1)
+                .coerceIn(0, ACCENT_COLORS.lastIndex)
             val accentColor = ACCENT_COLORS[accentIndex]
 
-            // ─── Применяем акцентный цвет к кнопке + ─────────────────────────
-            // RemoteViews не поддерживает setBackgroundColor для drawable,
-            // поэтому устанавливаем tint напрямую
-            views.setInt(R.id.widget_add_btn, "setBackgroundColor", accentColor)
+            // Меняем цвет фона кнопки через setInt -> setColorFilter на ImageView
+            // widget_add_bg это oval drawable — перекрашиваем через ImageView tint
+            views.setInt(R.id.widget_add_btn, "setColorFilter", accentColor)
 
-            // ─── Планы на сегодня ─────────────────────────────────────────────
+            // ── Планы на сегодня ──────────────────────────────────────────
             val plansJson = prefs.getString("flutter.plans", "{}") ?: "{}"
             val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
-            try {
-                val allPlans = JSONObject(plansJson)
-                val todayPlans = allPlans.optJSONArray(today)
-                val count = todayPlans?.length() ?: 0
+            val text = buildPlanText(plansJson, today)
+            views.setTextViewText(R.id.widget_plans, text)
 
-                if (count == 0) {
-                    views.setViewVisibility(R.id.widget_list, android.view.View.GONE)
-                    views.setViewVisibility(R.id.widget_empty, android.view.View.VISIBLE)
-                } else {
-                    views.setViewVisibility(R.id.widget_list, android.view.View.VISIBLE)
-                    views.setViewVisibility(R.id.widget_empty, android.view.View.GONE)
-
-                    // RemoteViewsService для ListView
-                    val serviceIntent = Intent(context, PlannerWidgetService::class.java).apply {
-                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                        data = Uri.parse(toUri(Intent.URI_INTENT_SCHEME))
-                    }
-                    views.setRemoteAdapter(R.id.widget_list, serviceIntent)
-                    views.setEmptyView(R.id.widget_list, R.id.widget_empty)
-
-                    // PendingIntent-шаблон для тапа на пункт (toggle done)
-                    val toggleIntent = Intent(context, PlannerWidget::class.java).apply {
-                        action = ACTION_TOGGLE_DONE
-                    }
-                    val togglePi = PendingIntent.getBroadcast(
-                        context, 0, toggleIntent,
-                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
-                    )
-                    views.setPendingIntentTemplate(R.id.widget_list, togglePi)
-                }
-            } catch (e: Exception) {
-                views.setViewVisibility(R.id.widget_list, android.view.View.GONE)
-                views.setViewVisibility(R.id.widget_empty, android.view.View.VISIBLE)
-            }
-
-            // ─── Тап на заголовок → открыть планировщик ──────────────────────
-            val openPlannerIntent = Intent(context, MainActivity::class.java).apply {
+            // ── Тап на заголовок → открыть планировщик ───────────────────
+            val openIntent = Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra("open_planner", true)
             }
-            val openPlannerPi = PendingIntent.getActivity(
-                context, 1, openPlannerIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            views.setOnClickPendingIntent(
+                R.id.widget_title,
+                PendingIntent.getActivity(context, 1, openIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             )
-            views.setOnClickPendingIntent(R.id.widget_title, openPlannerPi)
 
-            // ─── Тап на + → открыть планировщик с флагом add_plan=true ───────
-            // Flutter в PlannerScreen проверит этот флаг и сразу откроет bottomsheet
-            val addPlanIntent = Intent(context, MainActivity::class.java).apply {
+            // ── Тап на + → открыть добавление плана ──────────────────────
+            val addIntent = Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra("open_planner", true)
                 putExtra("add_plan", true)
             }
-            val addPlanPi = PendingIntent.getActivity(
-                context, 2, addPlanIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            views.setOnClickPendingIntent(
+                R.id.widget_add_btn,
+                PendingIntent.getActivity(context, 2, addIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             )
-            views.setOnClickPendingIntent(R.id.widget_add_btn, addPlanPi)
+
+            // ── Тап на список → открыть планировщик ──────────────────────
+            views.setOnClickPendingIntent(
+                R.id.widget_plans,
+                PendingIntent.getActivity(context, 3, openIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            )
 
             appWidgetManager.updateAppWidget(appWidgetId, views)
+        }
+
+        private fun buildPlanText(plansJson: String, today: String): String {
+            return try {
+                val allPlans = JSONObject(plansJson)
+                val todayPlans = allPlans.optJSONArray(today)
+
+                if (todayPlans == null || todayPlans.length() == 0) {
+                    "Нет планов на сегодня\nНажми + чтобы добавить"
+                } else {
+                    val sb = StringBuilder()
+                    for (i in 0 until todayPlans.length()) {
+                        val plan = todayPlans.getJSONObject(i)
+                        val text = plan.optString("text", "")
+                        val time = if (plan.isNull("time")) "" else plan.optString("time", "")
+                        val done = plan.optBoolean("done", false)
+
+                        val check = if (done) "✓" else "•"
+                        val timePart = if (time.isNotEmpty()) "$time  " else ""
+                        sb.append("$check  $timePart$text\n")
+                    }
+                    sb.toString().trimEnd()
+                }
+            } catch (e: Exception) {
+                "Нет планов на сегодня"
+            }
         }
 
         private fun togglePlanDone(context: Context, planId: String) {
