@@ -19,7 +19,6 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings  = AppSettings.of(context);
-    final isDark    = settings.themeMode == ThemeMode.dark;
     final textColor = Theme.of(context).colorScheme.onSurface;
 
     return Scaffold(
@@ -41,7 +40,7 @@ class SettingsScreen extends StatelessWidget {
                 // ── Тема ──────────────────────────────────────
                 _sectionLabel('Тема', textColor),
                 const SizedBox(height: 12),
-                _ThemeToggle(isDark: isDark, settings: settings),
+                _ThemeToggle(themeMode: settings.themeMode, settings: settings),
 
                 const SizedBox(height: 32),
 
@@ -191,51 +190,40 @@ class SettingsScreen extends StatelessWidget {
 }
 
 class _ThemeToggle extends StatelessWidget {
-  final bool isDark;
+  final ThemeMode themeMode;
   final AppSettings settings;
-  const _ThemeToggle({required this.isDark, required this.settings});
+  const _ThemeToggle({required this.themeMode, required this.settings});
 
   @override
   Widget build(BuildContext context) {
     final textColor = Theme.of(context).colorScheme.onSurface;
+
+    Widget btn(String label, ThemeMode mode) {
+      final isActive = themeMode == mode;
+      return Expanded(child: GestureDetector(
+        onTap: () { hapticLight(); settings.setTheme(mode); },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            color: isActive ? settings.accent : Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Center(child: Text(label,
+              style: TextStyle(fontWeight: FontWeight.w700,
+                  color: isActive ? Colors.white : textColor))),
+        ),
+      ));
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(children: [
-        Expanded(child: GestureDetector(
-          onTap: () {
-            hapticLight();
-            settings.setTheme(ThemeMode.light);
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            decoration: BoxDecoration(
-              color: !isDark ? settings.accent : Colors.transparent,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Center(child: Text('☀️ Светлая',
-                style: TextStyle(fontWeight: FontWeight.w700,
-                    color: !isDark ? Colors.white : textColor))),
-          ),
-        )),
-        Expanded(child: GestureDetector(
-          onTap: () {
-            hapticLight();
-            settings.setTheme(ThemeMode.dark);
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            decoration: BoxDecoration(
-              color: isDark ? settings.accent : Colors.transparent,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Center(child: Text('🌙 Тёмная',
-                style: TextStyle(fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white : textColor))),
-          ),
-        )),
+        btn('☀️ Светлая',  ThemeMode.light),
+        btn('🌙 Тёмная',   ThemeMode.dark),
+        btn('⚙️ Авто',     ThemeMode.system),
       ]),
     );
   }

@@ -197,8 +197,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -270,7 +271,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 onChanged: (_) => setState(() {}), // для обновления кнопки
               ),
 
-              const Spacer(),
+              const SizedBox(height: 28),
 
               // ── Кнопка ─────────────────────────────────────────
               SizedBox(
@@ -294,6 +295,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           fontWeight: FontWeight.w700)),
                 ),
               ),
+              const SizedBox(height: 16),
             ],
           ),
         ),

@@ -19,7 +19,7 @@ class MindfulDiaryApp extends StatefulWidget {
 }
 
 class _MindfulDiaryAppState extends State<MindfulDiaryApp> {
-  ThemeMode _themeMode = ThemeMode.light;
+  ThemeMode _themeMode = ThemeMode.system;
   Color _accent = AppColors.accentOrange; // см. constants/colors.dart
   bool _isPremium = false;
   bool _settingsLoaded = false;
@@ -33,12 +33,17 @@ class _MindfulDiaryAppState extends State<MindfulDiaryApp> {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    final isDark = prefs.getBool('isDark') ?? false;
+    final themeIndex = prefs.getInt('themeIndex') ?? 0; // 0=system,1=light,2=dark
+    final isDark = prefs.getBool('isDark') ?? false; // legacy fallback
     final accentIndex = prefs.getInt('accentIndex') ?? 0;
     final isPremium = prefs.getBool('isPremium') ?? false;
 
     setState(() {
-      _themeMode = isDark ? ThemeMode.dark : ThemeMode.light;
+      _themeMode = themeIndex == 1 ? ThemeMode.light
+                 : themeIndex == 2 ? ThemeMode.dark
+                 : prefs.containsKey('isDark')
+                     ? (isDark ? ThemeMode.dark : ThemeMode.light)
+                     : ThemeMode.system;
       _accent = AppColors.accents[accentIndex]; // массив из colors.dart
       _isPremium = isPremium;
       _settingsLoaded = true;
@@ -49,7 +54,8 @@ class _MindfulDiaryAppState extends State<MindfulDiaryApp> {
   void _setTheme(ThemeMode mode) async {
     setState(() => _themeMode = mode);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isDark', mode == ThemeMode.dark);
+    final idx = mode == ThemeMode.light ? 1 : mode == ThemeMode.dark ? 2 : 0;
+    await prefs.setInt('themeIndex', idx);
   }
 
   void _setAccent(Color color) async {

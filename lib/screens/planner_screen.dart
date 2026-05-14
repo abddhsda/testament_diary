@@ -57,8 +57,16 @@ class _PlannerScreenState extends State<PlannerScreen> {
     super.dispose();
   }
 
-  List<Map<String, dynamic>> get _selectedPlans =>
-      _allPlans[dateKey(_selectedDate)] ?? [];
+  List<Map<String, dynamic>> get _selectedPlans {
+    final plans = List<Map<String, dynamic>>.from(
+        _allPlans[dateKey(_selectedDate)] ?? []);
+    plans.sort((a, b) {
+      final aDone = (a['done'] as bool? ?? false) ? 1 : 0;
+      final bDone = (b['done'] as bool? ?? false) ? 1 : 0;
+      return aDone.compareTo(bDone);
+    });
+    return plans;
+  }
 
   bool _hasPlans(DateTime d) => (_allPlans[dateKey(d)] ?? []).isNotEmpty;
 
