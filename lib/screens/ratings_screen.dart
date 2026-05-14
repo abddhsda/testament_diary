@@ -1,11 +1,11 @@
 // ════════════════════════════════════════════════════
 // screens/ratings_screen.dart — оценка дня по 5 метрикам
-// Возвращает Map {answers, ratings} через Navigator.pop
 // ════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
 import '../app.dart';
 import '../constants/colors.dart';
+import '../utils/ui_helpers.dart';
 
 class RatingsScreen extends StatefulWidget {
   final List<String> answers;
@@ -16,14 +16,19 @@ class RatingsScreen extends StatefulWidget {
 }
 
 class _RatingsScreenState extends State<RatingsScreen> {
-  // Начальные значения всех метрик = 5
   double _energy       = 5;
   double _productivity = 5;
   double _mood         = 5;
   double _food         = 5;
   double _sleep        = 5;
 
+  // Запоминаем предыдущее значение чтобы вибрировать только при смене деления
+  final Map<String, int> _prevRounded = {
+    'energy': 5, 'productivity': 5, 'mood': 5, 'food': 5, 'sleep': 5,
+  };
+
   void _done() {
+    hapticSuccess(); // ← сохранение дня
     Navigator.pop(context, {
       'answers': widget.answers,
       'ratings': {
@@ -36,50 +41,82 @@ class _RatingsScreenState extends State<RatingsScreen> {
     });
   }
 
-  // ─── Универсальный слайдер ────────────────────────────────────
-  Widget _slider(String emoji, String label, double value,
-      ValueChanged<double> onChanged) {
-    final isDark = AppSettings.of(context).themeMode == ThemeMode.dark;
-    final textColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
+  void _onSliderChanged(String key, double value, void Function(double) setter) {
+    final rounded = value.round();
+    if (rounded != _prevRounded[key]) {
+      hapticLight(); // ← вибрация при смене деления слайдера
+      _prevRounded[key] = rounded;
+    }
+    setState(() => setter(value));
+  }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('$emoji $label',
-                style: TextStyle(fontSize: 16,
+  Widget _slider(
+    String emoji,
+    String label,
+    String key,
+    double value,
+    Color metricColor,
+    void Function(double) setter,
+  ) {
+    final isDark    = AppSettings.of(context).themeMode == ThemeMode.dark;
+    final textColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
+    final rounded   = value.round();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(children: [
+                Text(emoji, style: const TextStyle(fontSize: 18)),
+                const SizedBox(width: 10),
+                Text(label, style: TextStyle(fontSize: 15,
                     fontWeight: FontWeight.w600, color: textColor)),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                  color: textColor, borderRadius: BorderRadius.circular(12)),
-              child: Text('${value.round()}',
-                  style: TextStyle(
-                      color: isDark ? Colors.black : Colors.white,
-                      fontWeight: FontWeight.w700, fontSize: 16)),
-            ),
-          ],
-        ),
-        SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            activeTrackColor: textColor,
-            inactiveTrackColor: Colors.grey.shade800,
-            thumbColor: textColor,
-            overlayColor: textColor.withOpacity(0.1),
-            trackHeight: 4,
+              ]),
+              // Значение в цветном бейдже
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: metricColor,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text('$rounded',
+                    style: const TextStyle(color: Colors.white,
+                        fontWeight: FontWeight.w800, fontSize: 15)),
+              ),
+            ],
           ),
-          child: Slider(
-              value: value, min: 0, max: 10, divisions: 10, onChanged: onChanged),
-        ),
-        const SizedBox(height: 4),
-      ],
+          const SizedBox(height: 6),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: metricColor,
+              inactiveTrackColor: metricColor.withOpacity(0.15),
+              thumbColor: metricColor,
+              overlayColor: metricColor.withOpacity(0.12),
+              trackHeight: 4,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+            ),
+            child: Slider(
+              value: value,
+              min: 0, max: 10, divisions: 10,
+              onChanged: (v) => _onSliderChanged(key, v, setter),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark    = AppSettings.of(context).themeMode == ThemeMode.dark;
+    final textColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
+    final accent    = AppSettings.of(context).accent;
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
@@ -88,28 +125,36 @@ class _RatingsScreenState extends State<RatingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
               Text('Оцени день',
                   style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900,
-                      color: AppSettings.of(context).themeMode == ThemeMode.dark
-                          ? Colors.white : const Color(0xFF1A1A1A))),
+                      color: textColor)),
               const SizedBox(height: 4),
-              const Text('По шкале от 0 до 10',
-                  style: TextStyle(fontSize: 14, color: Colors.grey)),
-              const SizedBox(height: 32),
-              // Метрики в том же порядке что и в StatsScreen / AppColors.metricColors
-              _slider('😴', 'Энергия',       _energy,       (v) => setState(() => _energy = v)),
-              _slider('🎯', 'Продуктивность', _productivity, (v) => setState(() => _productivity = v)),
-              _slider('🧠', 'Настроение',    _mood,          (v) => setState(() => _mood = v)),
-              _slider('🍎', 'Еда',           _food,          (v) => setState(() => _food = v)),
-              _slider('💤', 'Сон',           _sleep,         (v) => setState(() => _sleep = v)),
+              Text('Сдвигай до нужного деления',
+                  style: TextStyle(fontSize: 14,
+                      color: textColor.withOpacity(0.4))),
+              const SizedBox(height: 28),
+
+              // Слайдеры — каждый в своём цвете
+              _slider('😴', 'Энергия',       'energy',       _energy,
+                  AppColors.metricEnergy,       (v) => _energy = v),
+              _slider('🎯', 'Продуктивность', 'productivity', _productivity,
+                  AppColors.metricProductivity, (v) => _productivity = v),
+              _slider('🧠', 'Настроение',    'mood',         _mood,
+                  AppColors.metricMood,         (v) => _mood = v),
+              _slider('🍎', 'Еда',           'food',         _food,
+                  AppColors.metricFood,         (v) => _food = v),
+              _slider('💤', 'Сон',           'sleep',        _sleep,
+                  AppColors.metricSleep,        (v) => _sleep = v),
+
               const Spacer(),
+
               SizedBox(
                 width: double.infinity, height: 56,
                 child: ElevatedButton(
                   onPressed: _done,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1A1A1A),
+                    backgroundColor: accent,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20)),

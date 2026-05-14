@@ -3,7 +3,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
 import 'dart:convert';
-import 'dart:math';
 
 final FlutterLocalNotificationsPlugin notifications =
     FlutterLocalNotificationsPlugin();
@@ -65,6 +64,15 @@ Future<void> initNotifications() async {
 
 Future<void> scheduleNotifications() async {
   final prefs = await SharedPreferences.getInstance();
+
+  // Пересчитываем расписание не чаще одного раза в день.
+  // Ключ 'notif_scheduled_date' хранит дату последнего расчёта.
+  final today = DateTime.now();
+  final todayKey =
+      '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+  final lastScheduled = prefs.getString('notif_scheduled_date') ?? '';
+  if (lastScheduled == todayKey) return; // уже запланировано сегодня
+
   final goal = prefs.getString('goal') ?? 'твоя цель';
   final entriesRaw = prefs.getString('entries') ?? '{}';
   final entries = jsonDecode(entriesRaw) as Map;
@@ -72,7 +80,9 @@ Future<void> scheduleNotifications() async {
   await notifications.cancelAll();
 
   final now = tz.TZDateTime.now(tz.local);
-  final random = Random();
+
+  // Детерминированный seed дня — совпадает с логикой daily_logic.dart
+  final seed = today.year * 10000 + today.month * 100 + today.day;
 
   // Считаем сколько дней без записи
   int daysMissed = 0;
@@ -117,7 +127,9 @@ Future<void> scheduleNotifications() async {
 
   final eveningBody = daysMissed >= 3
       ? _getReturnMessage(daysMissed, goal)
-      : motivationMessages[random.nextInt(motivationMessages.length)];
+      // Детерминированный выбор: одно сообщение на весь день (не меняется
+      // при каждом открытии приложения), но разное каждый день.
+      : motivationMessages[seed % motivationMessages.length];
 
   await notifications.zonedSchedule(
     id: 2,
@@ -137,7 +149,7 @@ Future<void> scheduleNotifications() async {
     matchDateTimeComponents: DateTimeComponents.time,
   );
 
-  // ── Дополнительное уведомление в 13:00 если 3+ дней без записи ──
+  // Дополнительное уведомление в 13:00 если 3+ дней без записи
   if (daysMissed >= 3) {
     var afternoon =
         tz.TZDateTime(tz.local, now.year, now.month, now.day, 13, 0);
@@ -162,6 +174,9 @@ Future<void> scheduleNotifications() async {
       matchDateTimeComponents: DateTimeComponents.time,
     );
   }
+
+  // Сохраняем дату последнего расчёта — следующий запуск пропустит
+  await prefs.setString('notif_scheduled_date', todayKey);
 }
 
 Future<void> schedulePlanReminder(String id, String text, DateTime when) async {

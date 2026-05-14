@@ -1,17 +1,13 @@
 // ════════════════════════════════════════════════════
 // screens/stats_screen.dart — экран статистики
-//
-// Новое:
-//   - Тап на точку графика → тултип с датой и значением
-//   - Чипы фильтрации: показ/скрытие отдельных метрик
-//   - Прогресс-бар под средним значением
+// Без стрелки назад — навигация через bottom nav
 // ════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../app.dart';
 import '../constants/colors.dart';
 import '../utils/ui_helpers.dart';
+import '../utils/date_labels.dart';
 import '../widgets/chart_painter.dart';
 
 class StatsScreen extends StatefulWidget {
@@ -25,14 +21,8 @@ class StatsScreen extends StatefulWidget {
 class _StatsScreenState extends State<StatsScreen> {
   int _selectedMonth = DateTime.now().month;
   int _selectedYear  = DateTime.now().year;
-
-  // null = все метрики показаны; строка = только эта выделена
   String? _highlightedMetric;
-
-  // Скрытые метрики (чипы с крестиком)
   final Set<String> _hiddenMetrics = {};
-
-  // Тултип: день и позиция
   int? _tooltipDay;
   double? _tooltipX;
 
@@ -64,38 +54,28 @@ class _StatsScreenState extends State<StatsScreen> {
     return result;
   }
 
-  // Данные конкретного дня для тултипа
   Map<String, int>? _getDayRatings(int day) {
     final key =
         '$_selectedYear-${_selectedMonth.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
     return widget.allRatings[key];
   }
 
-  static String _monthName(int month) {
-    const names = ['Янв','Фев','Мар','Апр','Май','Июн',
-                   'Июл','Авг','Сен','Окт','Ноя','Дек'];
-    return names[month - 1];
-  }
 
   void _onChartTap(TapDownDetails details, double chartWidth, int daysInMonth) {
-    final x = details.localPosition.dx;
+    final x   = details.localPosition.dx;
     final day = ((x / chartWidth) * daysInMonth).floor() + 1;
     final clampedDay = day.clamp(1, daysInMonth);
     final dayData = _getDayRatings(clampedDay);
-
     if (dayData == null || dayData.isEmpty) {
       setState(() { _tooltipDay = null; _tooltipX = null; });
       return;
     }
-
     hapticLight();
     setState(() {
       if (_tooltipDay == clampedDay) {
-        _tooltipDay = null;
-        _tooltipX   = null;
+        _tooltipDay = null; _tooltipX = null;
       } else {
-        _tooltipDay = clampedDay;
-        _tooltipX   = x;
+        _tooltipDay = clampedDay; _tooltipX = x;
       }
     });
   }
@@ -110,20 +90,16 @@ class _StatsScreenState extends State<StatsScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
+        bottom: false,
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Шапка ──────────────────────────────────────────
-              Row(children: [
-                GestureDetector(
-                  onTap: () { hapticLight(); Navigator.pop(context); },
-                  child: Icon(Icons.arrow_back, color: textColor)),
-                const SizedBox(width: 16),
-                Text('Статистика', style: TextStyle(fontSize: 24,
-                    fontWeight: FontWeight.w900, color: textColor)),
-              ]),
+              // ── Заголовок (без стрелки назад) ─────────────────
+              Text('📊 Статистика',
+                  style: TextStyle(fontSize: 24,
+                      fontWeight: FontWeight.w900, color: textColor)),
 
               const SizedBox(height: 24),
 
@@ -140,9 +116,9 @@ class _StatsScreenState extends State<StatsScreen> {
                         else _selectedMonth--;
                       });
                     },
-                    icon: Icon(Icons.chevron_left, color: textColor),
+                    icon: Icon(Icons.chevron_left, color: accent),
                   ),
-                  Text('${_monthName(_selectedMonth)} $_selectedYear',
+                  Text('${monthShortCap[_selectedMonth - 1]} $_selectedYear',
                       style: TextStyle(fontSize: 18,
                           fontWeight: FontWeight.w700, color: textColor)),
                   IconButton(
@@ -154,12 +130,12 @@ class _StatsScreenState extends State<StatsScreen> {
                         else _selectedMonth++;
                       });
                     },
-                    icon: Icon(Icons.chevron_right, color: textColor),
+                    icon: Icon(Icons.chevron_right, color: accent),
                   ),
                 ],
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
 
               Expanded(
                 child: !hasData
@@ -167,7 +143,7 @@ class _StatsScreenState extends State<StatsScreen> {
                         style: TextStyle(color: textColor.withOpacity(0.4))))
                     : SingleChildScrollView(
                         child: Column(children: [
-                          // ── Средние значения ──────────────────
+                          // ── Средние значения ───────────────────
                           Container(
                             padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
@@ -216,12 +192,12 @@ class _StatsScreenState extends State<StatsScreen> {
                                           ]),
                                           if (avg > 0) ...[
                                             const SizedBox(height: 6),
-                                            // Прогресс-бар
                                             ClipRRect(
                                               borderRadius: BorderRadius.circular(4),
                                               child: LinearProgressIndicator(
                                                 value: avg / 10,
-                                                backgroundColor: textColor.withOpacity(0.08),
+                                                backgroundColor:
+                                                    textColor.withOpacity(0.08),
                                                 valueColor: AlwaysStoppedAnimation<Color>(
                                                     _highlightedMetric == _metrics[i]
                                                         ? color
@@ -241,7 +217,7 @@ class _StatsScreenState extends State<StatsScreen> {
 
                           const SizedBox(height: 16),
 
-                          // ── График ────────────────────────────
+                          // ── График ─────────────────────────────
                           Container(
                             padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
@@ -249,7 +225,6 @@ class _StatsScreenState extends State<StatsScreen> {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Column(children: [
-                              // Чипы фильтрации
                               Wrap(
                                 spacing: 8, runSpacing: 8,
                                 children: List.generate(_metrics.length, (i) {
@@ -258,7 +233,6 @@ class _StatsScreenState extends State<StatsScreen> {
                                   final color = isHidden
                                       ? Colors.grey.shade600
                                       : AppColors.metricColors[i];
-
                                   return GestureDetector(
                                     onTap: () {
                                       hapticLight();
@@ -297,7 +271,8 @@ class _StatsScreenState extends State<StatsScreen> {
                                             : Colors.transparent,
                                         borderRadius: BorderRadius.circular(20),
                                         border: Border.all(
-                                          color: color.withOpacity(isHidden ? 0.3 : (isHighlighted ? 1.0 : 0.5)),
+                                          color: color.withOpacity(
+                                              isHidden ? 0.3 : (isHighlighted ? 1.0 : 0.5)),
                                           width: isHighlighted ? 1.5 : 1,
                                         ),
                                       ),
@@ -317,22 +292,17 @@ class _StatsScreenState extends State<StatsScreen> {
                                   );
                                 }),
                               ),
-
                               const SizedBox(height: 4),
                               Text('Тап — выделить • Долгий тап — скрыть',
                                   style: TextStyle(fontSize: 10,
                                       color: textColor.withOpacity(0.3))),
-
                               const SizedBox(height: 12),
-
-                              // График с тултипом
                               SizedBox(
                                 height: 220,
                                 child: _buildChart(textColor),
                               ),
                             ]),
                           ),
-
                           const SizedBox(height: 24),
                         ]),
                       ),
@@ -356,7 +326,6 @@ class _StatsScreenState extends State<StatsScreen> {
         child: Column(children: [
           Expanded(
             child: Stack(children: [
-              // ── График ────────────────────────────────────────
               GestureDetector(
                 onTapDown: (d) => _onChartTap(d, chartWidth, daysInMonth),
                 child: ClipRect(
@@ -377,15 +346,11 @@ class _StatsScreenState extends State<StatsScreen> {
                   ),
                 ),
               ),
-
-              // ── Тултип при тапе ───────────────────────────────
               if (_tooltipDay != null && _tooltipX != null)
                 _buildTooltip(daysInMonth, chartWidth, isDark, textColor),
             ]),
           ),
-
           const SizedBox(height: 4),
-          // Ось X — числа дней
           Row(
             children: List.generate(daysInMonth, (i) {
               final day  = i + 1;
@@ -409,17 +374,15 @@ class _StatsScreenState extends State<StatsScreen> {
     );
   }
 
-  Widget _buildTooltip(int daysInMonth, double chartWidth, bool isDark, Color textColor) {
+  Widget _buildTooltip(
+      int daysInMonth, double chartWidth, bool isDark, Color textColor) {
     final dayData = _getDayRatings(_tooltipDay!);
     if (dayData == null) return const SizedBox();
-
-    // Позиция тултипа — пузырь над точкой
-    final x     = (_tooltipDay! - 1) / daysInMonth * chartWidth;
-    final left  = (x - 70).clamp(0.0, chartWidth - 140);
+    final x    = (_tooltipDay! - 1) / daysInMonth * chartWidth;
+    final left = (x - 70).clamp(0.0, chartWidth - 140);
 
     return Positioned(
-      left: left,
-      top: 0,
+      left: left, top: 0,
       child: GestureDetector(
         onTap: () => setState(() { _tooltipDay = null; _tooltipX = null; }),
         child: Container(
@@ -428,25 +391,18 @@ class _StatsScreenState extends State<StatsScreen> {
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF2A2A2A) : Colors.white,
             borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.15),
-                  blurRadius: 8, offset: const Offset(0, 2)),
-            ],
-            border: Border.all(
-                color: textColor.withOpacity(0.1)),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15),
+                blurRadius: 8, offset: const Offset(0, 2))],
+            border: Border.all(color: textColor.withOpacity(0.1)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Дата
-              Text(
-                '${_tooltipDay} ${_monthName(_selectedMonth)}',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
-                    color: textColor.withOpacity(0.6)),
-              ),
+              Text('${_tooltipDay} ${monthShortCap[_selectedMonth - 1]}',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+                      color: textColor.withOpacity(0.6))),
               const SizedBox(height: 6),
-              // Значения метрик
               ..._visibleMetrics.map((m) {
                 final i     = _metrics.indexOf(m);
                 final value = dayData[m];
@@ -459,14 +415,12 @@ class _StatsScreenState extends State<StatsScreen> {
                             color: AppColors.metricColors[i],
                             shape: BoxShape.circle)),
                     const SizedBox(width: 5),
-                    Text(_labels[i],
-                        style: TextStyle(fontSize: 10,
-                            color: textColor.withOpacity(0.7))),
+                    Text(_labels[i], style: TextStyle(fontSize: 10,
+                        color: textColor.withOpacity(0.7))),
                     const Spacer(),
-                    Text('$value',
-                        style: TextStyle(fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.metricColors[i])),
+                    Text('$value', style: TextStyle(fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.metricColors[i])),
                   ]),
                 );
               }),

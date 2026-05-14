@@ -1,12 +1,10 @@
 // ════════════════════════════════════════════════════
 // widgets/section_block.dart — коллапсируемый блок
-//
-// Используется в EntryCard для секций:
-//   "Вопросы дня", "Опрос", "Заметки"
-// Tap по заголовку → expand / collapse
+// Тап по заголовку → expand / collapse с анимацией
 // ════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
+import '../utils/ui_helpers.dart';
 
 class SectionBlock extends StatefulWidget {
   final String emoji;
@@ -15,7 +13,7 @@ class SectionBlock extends StatefulWidget {
   final List<Widget> children;
   final bool initiallyExpanded;
   final void Function(bool)? onToggle;
-  final String? emptyHint; // текст-превью в свёрнутом состоянии
+  final String? emptyHint;
 
   const SectionBlock({
     super.key,
@@ -23,7 +21,7 @@ class SectionBlock extends StatefulWidget {
     required this.title,
     required this.labelColor,
     required this.children,
-    this.initiallyExpanded = false,
+    this.initiallyExpanded = true, // ← открыт по умолчанию
     this.onToggle,
     this.emptyHint,
   });
@@ -32,21 +30,48 @@ class SectionBlock extends StatefulWidget {
   State<SectionBlock> createState() => _SectionBlockState();
 }
 
-class _SectionBlockState extends State<SectionBlock> {
+class _SectionBlockState extends State<SectionBlock>
+    with SingleTickerProviderStateMixin {
   late bool _expanded;
+  late AnimationController _controller;
+  late Animation<double> _expandAnim;
 
   @override
   void initState() {
     super.initState();
     _expanded = widget.initiallyExpanded;
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+      value: _expanded ? 1.0 : 0.0,
+    );
+    _expandAnim = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    hapticLight();
+    setState(() => _expanded = !_expanded);
+    if (_expanded) {
+      _controller.forward();
+    } else {
+      _controller.reverse();
+    }
+    widget.onToggle?.call(_expanded);
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark   = Theme.of(context).brightness == Brightness.dark;
-    final surface  = Theme.of(context).colorScheme.surface;
-
-    // Фон блока чуть светлее/темнее surface
+    final isDark  = Theme.of(context).brightness == Brightness.dark;
+    final surface = Theme.of(context).colorScheme.surface;
     final bg = isDark
         ? Color.alphaBlend(Colors.white.withOpacity(0.04), surface)
         : Color.alphaBlend(Colors.black.withOpacity(0.03), surface);
@@ -60,31 +85,33 @@ class _SectionBlockState extends State<SectionBlock> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Заголовок (тап = toggle) ──────────────────────────
+          // ── Заголовок ────────────────────────────────────────
           GestureDetector(
-            onTap: () {
-              setState(() => _expanded = !_expanded);
-              widget.onToggle?.call(_expanded);
-            },
-            child: Container(
+            onTap: _toggle,
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(children: [
                 Text(widget.emoji, style: const TextStyle(fontSize: 16)),
                 const SizedBox(width: 8),
-                Text(widget.title,
-                    style: TextStyle(fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: widget.labelColor)),
-                const Spacer(),
-                Icon(
-                  _expanded ? Icons.expand_less : Icons.expand_more,
-                  color: widget.labelColor, size: 20,
+                Expanded(
+                  child: Text(widget.title,
+                      style: TextStyle(fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: widget.labelColor)),
+                ),
+                AnimatedRotation(
+                  turns: _expanded ? 0.5 : 0.0,
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOutCubic,
+                  child: Icon(Icons.expand_more,
+                      color: widget.labelColor, size: 20),
                 ),
               ]),
             ),
           ),
 
-          // ── Превью в свёрнутом виде ───────────────────────────
+          // ── Превью (свёрнуто) ─────────────────────────────────
           if (!_expanded && widget.emptyHint != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
@@ -96,17 +123,24 @@ class _SectionBlockState extends State<SectionBlock> {
                       height: 1.4)),
             ),
 
-          // ── Содержимое (раскрытое состояние) ─────────────────
-          if (_expanded) ...[
-            Divider(height: 1, color: widget.labelColor.withOpacity(0.1)),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: widget.children,
-              ),
+          // ── Содержимое с анимацией ────────────────────────────
+          SizeTransition(
+            sizeFactor: _expandAnim,
+            axisAlignment: -1,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Divider(height: 1, color: widget.labelColor.withOpacity(0.1)),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: widget.children,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ],
       ),
     );

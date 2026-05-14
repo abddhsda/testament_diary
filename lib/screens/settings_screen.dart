@@ -1,15 +1,20 @@
 // ════════════════════════════════════════════════════
-// screens/settings_screen.dart — экран настроек
+// screens/settings_screen.dart — настройки
+// Без стрелки назад — навигация через bottom nav
 // ════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
 import '../app.dart';
 import '../constants/colors.dart';
+import '../utils/ui_helpers.dart';
 import '../widgets/premium_section.dart';
 import '../services/export_service.dart';
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+  /// Вызывается после успешного импорта JSON — перезагружает данные в HomeScreen.
+  final Future<void> Function()? onImported;
+
+  const SettingsScreen({super.key, this.onImported});
 
   @override
   Widget build(BuildContext context) {
@@ -19,34 +24,28 @@ class SettingsScreen extends StatelessWidget {
 
     return Scaffold(
       body: SafeArea(
+        bottom: false,
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Шапка ──────────────────────────────────────────
-                Row(children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Icon(Icons.arrow_back, color: textColor),
-                  ),
-                  const SizedBox(width: 16),
-                  Text('Настройки',
-                      style: TextStyle(fontSize: 24,
-                          fontWeight: FontWeight.w900, color: textColor)),
-                ]),
+                // ── Заголовок (без стрелки) ────────────────────
+                Text('⚙️ Настройки',
+                    style: TextStyle(fontSize: 24,
+                        fontWeight: FontWeight.w900, color: textColor)),
 
                 const SizedBox(height: 32),
 
-                // ── Тема ───────────────────────────────────────────
+                // ── Тема ──────────────────────────────────────
                 _sectionLabel('Тема', textColor),
                 const SizedBox(height: 12),
                 _ThemeToggle(isDark: isDark, settings: settings),
 
                 const SizedBox(height: 32),
 
-                // ── Акцентный цвет ─────────────────────────────────
+                // ── Акцентный цвет ────────────────────────────
                 _sectionLabel('Акцентный цвет', textColor),
                 const SizedBox(height: 12),
                 ...List.generate(AppColors.accents.length, (i) =>
@@ -54,20 +53,23 @@ class SettingsScreen extends StatelessWidget {
                       color: AppColors.accents[i],
                       name: AppColors.accentNames[i],
                       isSelected: settings.accent == AppColors.accents[i],
-                      onTap: () => settings.setAccent(AppColors.accents[i]),
+                      onTap: () {
+                        hapticLight();
+                        settings.setAccent(AppColors.accents[i]);
+                      },
                     )),
 
                 const SizedBox(height: 32),
 
-                // ── Premium ────────────────────────────────────────
+                // ── Premium ───────────────────────────────────
                 _sectionLabel('Premium', textColor),
                 const SizedBox(height: 12),
                 const PremiumSection(),
 
                 const SizedBox(height: 32),
 
-                // ── Экспорт данных ─────────────────────────────────
-                _sectionLabel('Экспорт данных', textColor),
+                // ── Экспорт ───────────────────────────────────
+                _sectionLabel('Экспорт и импорт', textColor),
                 const SizedBox(height: 12),
                 Container(
                   decoration: BoxDecoration(
@@ -75,32 +77,48 @@ class SettingsScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Column(children: [
-                    // TXT — читаемый формат
                     _actionItem(
                       context: context,
                       icon: Icons.description_outlined,
                       label: 'Экспорт в TXT',
-                      sublabel: 'Читаемый текстовый файл',
+                      sublabel: 'Читаемый дневник',
                       textColor: textColor,
-                      onTap: () => ExportService.exportTxt(context),
+                      onTap: () { hapticLight(); ExportService.exportTxt(context); },
                     ),
-                    Divider(height: 1, indent: 56,
-                        color: textColor.withOpacity(0.1)),
-                    // JSON — резервная копия
+                    Divider(height: 1, indent: 56, color: textColor.withOpacity(0.1)),
+                    _actionItem(
+                      context: context,
+                      icon: Icons.table_chart_outlined,
+                      label: 'Экспорт в CSV',
+                      sublabel: 'Таблица для Excel / Sheets',
+                      textColor: textColor,
+                      onTap: () { hapticLight(); ExportService.exportCsv(context); },
+                    ),
+                    Divider(height: 1, indent: 56, color: textColor.withOpacity(0.1)),
                     _actionItem(
                       context: context,
                       icon: Icons.backup_outlined,
                       label: 'Резервная копия JSON',
-                      sublabel: 'Все данные для переноса',
+                      sublabel: 'Полный бэкап всех данных',
                       textColor: textColor,
-                      onTap: () => ExportService.exportJson(context),
+                      onTap: () { hapticLight(); ExportService.exportJson(context); },
+                    ),
+                    Divider(height: 1, indent: 56, color: textColor.withOpacity(0.1)),
+                    _actionItem(
+                      context: context,
+                      icon: Icons.restore_outlined,
+                      label: 'Импорт из JSON',
+                      sublabel: 'Восстановить из бэкапа',
+                      textColor: textColor,
+                      iconColor: Colors.orange,
+                      onTap: () { hapticLight(); ExportService.importJson(context, onImported: onImported); },
                     ),
                   ]),
                 ),
 
                 const SizedBox(height: 32),
 
-                // ── Скоро ──────────────────────────────────────────
+                // ── Скоро ─────────────────────────────────────
                 _sectionLabel('Скоро', textColor),
                 const SizedBox(height: 12),
                 Container(
@@ -109,14 +127,16 @@ class SettingsScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Column(children: [
-                    _futureItem(context, Icons.notifications_outlined,
+                    _futureItem(Icons.notifications_outlined,
                         'Время уведомлений', textColor),
                     Divider(height: 1, indent: 56,
                         color: textColor.withOpacity(0.1)),
-                    _futureItem(context, Icons.info_outline,
+                    _futureItem(Icons.info_outline,
                         'О приложении', textColor),
                   ]),
                 ),
+
+                const SizedBox(height: 16),
               ],
             ),
           ),
@@ -125,9 +145,8 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _sectionLabel(String label, Color textColor) =>
-      Text(label, style: TextStyle(fontSize: 13,
-          color: textColor.withOpacity(0.5),
+  Widget _sectionLabel(String label, Color textColor) => Text(label,
+      style: TextStyle(fontSize: 13, color: textColor.withOpacity(0.5),
           fontWeight: FontWeight.w600, letterSpacing: 1));
 
   Widget _actionItem({
@@ -137,41 +156,38 @@ class SettingsScreen extends StatelessWidget {
     required String sublabel,
     required Color textColor,
     required VoidCallback onTap,
+    Color? iconColor,
   }) =>
       GestureDetector(
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(children: [
-            Icon(icon, color: textColor.withOpacity(0.7), size: 22),
+            Icon(icon, color: iconColor ?? textColor.withOpacity(0.7), size: 22),
             const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label, style: TextStyle(fontSize: 16, color: textColor)),
-                  Text(sublabel,
-                      style: TextStyle(fontSize: 12,
-                          color: textColor.withOpacity(0.4))),
-                ],
-              ),
-            ),
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: TextStyle(fontSize: 16, color: textColor)),
+                Text(sublabel, style: TextStyle(fontSize: 12,
+                    color: textColor.withOpacity(0.4))),
+              ],
+            )),
             Icon(Icons.chevron_right, color: textColor.withOpacity(0.3)),
           ]),
         ),
       );
 
-  Widget _futureItem(BuildContext ctx, IconData icon, String label, Color textColor) =>
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(children: [
-          Icon(icon, color: textColor.withOpacity(0.4), size: 22),
-          const SizedBox(width: 16),
-          Text(label, style: TextStyle(fontSize: 16, color: textColor.withOpacity(0.4))),
-          const Spacer(),
-          Icon(Icons.chevron_right, color: textColor.withOpacity(0.2)),
-        ]),
-      );
+  Widget _futureItem(IconData icon, String label, Color textColor) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    child: Row(children: [
+      Icon(icon, color: textColor.withOpacity(0.4), size: 22),
+      const SizedBox(width: 16),
+      Text(label, style: TextStyle(fontSize: 16, color: textColor.withOpacity(0.4))),
+      const Spacer(),
+      Icon(Icons.chevron_right, color: textColor.withOpacity(0.2)),
+    ]),
+  );
 }
 
 class _ThemeToggle extends StatelessWidget {
@@ -189,7 +205,10 @@ class _ThemeToggle extends StatelessWidget {
       ),
       child: Row(children: [
         Expanded(child: GestureDetector(
-          onTap: () => settings.setTheme(ThemeMode.light),
+          onTap: () {
+            hapticLight();
+            settings.setTheme(ThemeMode.light);
+          },
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 14),
             decoration: BoxDecoration(
@@ -202,7 +221,10 @@ class _ThemeToggle extends StatelessWidget {
           ),
         )),
         Expanded(child: GestureDetector(
-          onTap: () => settings.setTheme(ThemeMode.dark),
+          onTap: () {
+            hapticLight();
+            settings.setTheme(ThemeMode.dark);
+          },
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 14),
             decoration: BoxDecoration(

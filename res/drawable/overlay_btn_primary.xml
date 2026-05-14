@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Кнопка "Добавить" — полностью округлая как в Flutter приложении -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#FFE8927C" />
+    <corners android:radius="999dp" />
+</shape>

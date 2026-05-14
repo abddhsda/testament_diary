@@ -59,16 +59,20 @@ List<Map<String, String>> getDailyQuestions(
     for (int i = 0; i < weight; i++) pool.add(key);
   });
 
-  // Выбираем 3 уникальных категории
+  // Выбираем 3 уникальных категории.
+  // Множители 13 и 37 — простые числа, обеспечивают равномерное распределение
+  // при обходе массива pool через модуль (избегаем циклических повторений).
+  const int stepA = 13;
+  const int stepB = 37;
   final result = <Map<String, String>>[];
   final usedCategories = <String>{};
   int attempts = 0;
   while (result.length < 3 && attempts < 100) {
-    final pickedCategory = pool[(seed + attempts * 13) % pool.length];
+    final pickedCategory = pool[(seed + attempts * stepA) % pool.length];
     if (!usedCategories.contains(pickedCategory)) {
       usedCategories.add(pickedCategory);
       final questions = questionBank[pickedCategory]!;
-      result.add(questions[(seed + attempts * 37) % questions.length]);
+      result.add(questions[(seed + attempts * stepB) % questions.length]);
     }
     attempts++;
   }
@@ -81,7 +85,8 @@ List<Map<String, String>> getDailyQuestions(
     }
   }
 
-  // 3 глубоких вопроса (emoji = 🔍)
+  // 3 глубоких вопроса (emoji = 🔍).
+  // Множители 7 и 41 — простые числа, аналогично выше.
   final deepQuestions = deepQuestionBank[category] ?? deepQuestionBank['money']!;
   final deep = <Map<String, String>>[];
   final usedDeep = <int>{};

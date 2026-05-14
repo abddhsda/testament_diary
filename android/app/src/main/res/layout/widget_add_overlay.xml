@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- gravity=bottom + fitsSystemWindows: карточка поднимается над клавиатурой -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="bottom"
+    android:fitsSystemWindows="true"
+    android:background="#99000000">
+
+    <LinearLayout
+        android:id="@+id/overlay_card"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/overlay_card_bg"
+        android:padding="20dp"
+        android:paddingBottom="24dp">
+
+        <TextView
+            android:id="@+id/overlay_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Новый план"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:layout_marginBottom="14dp" />
+
+        <EditText
+            android:id="@+id/overlay_input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Что планируешь?"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:background="@drawable/overlay_input_bg"
+            android:padding="12dp"
+            android:inputType="text"
+            android:imeOptions="actionDone"
+            android:maxLines="2" />
+
+        <LinearLayout
+            android:id="@+id/overlay_time_row"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/overlay_input_bg"
+            android:padding="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="&#128336;"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/overlay_time_label"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Добавить время (необязательно)"
+                android:textColor="#88FFFFFF"
+                android:textSize="14sp"
+                android:layout_marginStart="8dp" />
+
+            <TextView
+                android:id="@+id/overlay_time_clear"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="x"
+                android:textColor="#88FFFFFF"
+                android:textSize="14sp"
+                android:visibility="gone"
+                android:padding="4dp" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="16dp"
+            android:weightSum="2">
+
+            <Button
+                android:id="@+id/overlay_cancel"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:text="Отмена"
+                android:textColor="#AAFFFFFF"
+                android:background="@drawable/overlay_btn_secondary"
+                android:layout_marginEnd="8dp" />
+
+            <Button
+                android:id="@+id/overlay_save"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:text="Добавить"
+                android:textColor="#FFFFFF"
+                android:background="@drawable/overlay_btn_primary"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</LinearLayout>

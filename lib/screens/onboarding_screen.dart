@@ -7,7 +7,7 @@
 
 import 'package:flutter/material.dart';
 import '../app.dart';
-import 'package:mindful_diary/notifications.dart' as notif;
+import '../services/notifications.dart' as notif;
 
 // ════════════════════════════════════════════════════
 // SplashOnboarding — слайды при первом запуске
